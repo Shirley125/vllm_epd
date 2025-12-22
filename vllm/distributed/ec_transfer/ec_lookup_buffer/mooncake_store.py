@@ -195,7 +195,8 @@ class ECMooncakeStore:
         if self.config.fast_transfer:
             self.store.unregister_buffer(self.tensor_pool.base_address,
                                          self.config.fast_transfer_buffer_size)
-            self.tensor_pool.cleanup()
+            with self.pool_lock:
+                self.tensor_pool.cleanup()
 
         self.put_loop.call_soon_threadsafe(self.put_loop.stop)
         self.put_thread.join()
@@ -275,6 +276,7 @@ class ECMooncakeStore:
             with self.pool_lock:
                 self.tensor_pool.batch_free(buffer_addrs)
             logger.error("batch_get_into failed: %s", str(e))
+            return results
 
         # NOTE: should I delay free buffer
         for id, addr, dtype, shape, read_byte in zip(exist_ids, buffer_addrs,
@@ -282,8 +284,9 @@ class ECMooncakeStore:
                                                      buffer_shapes,
                                                      read_bytes):
             if read_byte > 0:
-                results[id] = self.tensor_pool.load_tensor(
-                    addr, dtype, shape, device)
+                with self.pool_lock:
+                    results[id] = self.tensor_pool.load_tensor(
+                        addr, dtype, shape, device)
 
         with self.pool_lock:
             self.tensor_pool.batch_free(buffer_addrs)

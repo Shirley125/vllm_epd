@@ -94,7 +94,8 @@ class ECMooncakeStorageConnector(ECConnectorBase):
                 req_id, mm_hashes, encoder_cache = await \
                     self._pending_load_reqs.get()
                 try:
-                    tensors = self.store.batch_get(mm_hashes, self.device)
+                    tensors = await asyncio.to_thread(
+                        self.store.batch_get, mm_hashes, self.device)
                 except Exception as e:
                     logger.error("Batch get failed for %s with error %s",
                                  mm_hashes, e)
