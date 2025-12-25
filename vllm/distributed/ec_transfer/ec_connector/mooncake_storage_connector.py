@@ -225,7 +225,7 @@ class ECMooncakeStorageConnector(ECConnectorBase):
                 self._finished_save_reqs)
             if load_failed_recompute:
                 load_failed_req = self._get_finished_queue_request(
-                    self._finished_load_reqs)
+                    self._load_failed_reqs)
             return finished_save, finished_load, load_failed_req
         return None, None, None
 
