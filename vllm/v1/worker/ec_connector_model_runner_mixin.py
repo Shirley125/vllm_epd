@@ -82,7 +82,7 @@ class ECConnectorModelRunnerMixin:
         try:
             yield output
         finally:
-            output.finished_sending, output.finished_recving = (
+            output.finished_sending, output.finished_recving, output.load_failed = (
                 ec_connector.get_finished(scheduler_output.finished_req_ids))
 
             ec_connector.clear_connector_metadata()

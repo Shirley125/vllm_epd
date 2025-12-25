@@ -155,6 +155,9 @@ class Scheduler(SchedulerInterface):
         # EC Connector: requests in process of async EC loading or recving
         self.finished_recving_ec_req_ids: set[str] = set()
 
+        # EC Connector: requests failed for async EC loading or recving
+        self.load_failed_ec_req_ids: set[str] = set()
+
         # NOTE(woosuk): Here, "encoder" includes the vision encoder (and
         # projector if needed) for MM models as well as encoder-decoder
         # transformers.
@@ -1404,6 +1407,9 @@ class Scheduler(SchedulerInterface):
 
     def _update_waiting_for_remote_ec(self, request: Request) -> bool:
         assert self.ec_connector is not None
+        if request.request_id in self.load_failed_ec_req_ids:
+            self.load_failed_ec_req_ids.remove(request.request_id)
+            return True
         if request.request_id not in self.finished_recving_ec_req_ids:
             return False
         self.encoder_cache_manager.cache(request)
@@ -1430,6 +1436,9 @@ class Scheduler(SchedulerInterface):
         for req_id in (ec_connector_output.finished_recving or ()):
             logger.debug("Finished recving EC transfer for request %s", req_id)
             self.finished_recving_ec_req_ids.add(req_id)
+        for req_id in (ec_connector_output.load_failed or ()):
+            logger.debug("Failed to receive EC transfer for request %s", req_id)
+            self.load_failed_ec_req_ids.add(req_id)
         for req_id in (ec_connector_output.finished_sending or ()):
             logger.debug("Finished sending EC transfer for request %s", req_id)
             if req_id not in self.requests:

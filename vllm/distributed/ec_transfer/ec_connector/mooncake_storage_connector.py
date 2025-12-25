@@ -24,6 +24,7 @@ SLEEP_TIMEOUT = 0.005
 
 ec_store_type = os.getenv("EC_STORE_TYPE", "mooncake")
 async_handler = int(os.getenv("EC_STORE_ASYNC", 1))
+load_failed_recompute = int(os.getenv("LOAD_FAILED_RECOMPUTE", 1))
 module_name = _EC_STORE_MODULES.get(ec_store_type,
                                     _EC_STORE_MODULES["mooncake"])
 ECMooncakeStore = import_module(module_name).ECMooncakeStore
@@ -75,6 +76,7 @@ class ECMooncakeStorageConnector(ECConnectorBase):
 
             self._finished_load_reqs: asyncio.Queue[str] = asyncio.Queue()
             self._finished_save_reqs: asyncio.Queue[str] = asyncio.Queue()
+            self._load_failed_reqs: asyncio.Queue[str] = asyncio.Queue()
 
             thread = threading.Thread(target=self.start_event_loop,
                                       daemon=True)
@@ -99,13 +101,19 @@ class ECMooncakeStorageConnector(ECConnectorBase):
                 except Exception as e:
                     logger.error("Batch get failed for %s with error %s",
                                  mm_hashes, e)
-                    await self._pending_load_reqs.put\
-                        ((req_id, mm_hashes, encoder_cache))
+                    if load_failed_recompute:
+                        await self._load_failed_reqs.put(req_id)
+                    else:
+                        await self._pending_load_reqs.put\
+                            ((req_id, mm_hashes, encoder_cache))
                     continue
 
                 if any(t is None for t in tensors):
                     logger.error("Load failed for %s", mm_hashes)
-                    await self._pending_load_reqs.put \
+                    if load_failed_recompute:
+                        await self._load_failed_reqs.put(req_id)
+                    else:
+                        await self._pending_load_reqs.put \
                         ((req_id, mm_hashes, encoder_cache))
                     continue
                 for mm_hash, ec_cache in zip(mm_hashes, tensors):
@@ -208,14 +216,18 @@ class ECMooncakeStorageConnector(ECConnectorBase):
 
     def get_finished(
         self, finished_req_ids: set[str]
-    ) -> tuple[Optional[set[str]], Optional[set[str]]]:
+    ) -> tuple[Optional[set[str]], Optional[set[str]], Optional[set[str]]]:
+        load_failed_req = None
         if async_handler:
             finished_load = self._get_finished_queue_request(
                 self._finished_load_reqs)
             finished_save = self._get_finished_queue_request(
                 self._finished_save_reqs)
-            return finished_save, finished_load
-        return None, None
+            if load_failed_recompute:
+                load_failed_req = self._get_finished_queue_request(
+                    self._finished_load_reqs)
+            return finished_save, finished_load, load_failed_req
+        return None, None, None
 
     def _get_finished_queue_request(self, q: asyncio.Queue) -> set[str]:
         finished_reqs = set()

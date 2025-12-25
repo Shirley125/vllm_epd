@@ -87,10 +87,13 @@ class KVConnectorModelRunnerMixin:
                                ec_connector_output.finished_recving)
         ec_finished_sending = (None if ec_connector_output is None else
                                ec_connector_output.finished_sending)
+        ec_load_failed = (None if ec_connector_output is None else
+                               ec_connector_output.load_failed)
 
         if (not kv_connector_output.finished_sending
                 and not kv_connector_output.finished_recving
-                and not ec_finished_recving and not ec_finished_sending):
+                and not ec_finished_recving and not ec_finished_sending
+                and not ec_load_failed):
             return EMPTY_MODEL_RUNNER_OUTPUT
 
         output = copy.copy(EMPTY_MODEL_RUNNER_OUTPUT)

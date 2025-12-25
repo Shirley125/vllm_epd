@@ -100,6 +100,7 @@ class ECConnectorOutput:
     # [mm_hash]
     finished_sending: Optional[set[str]] = None
     finished_recving: Optional[set[str]] = None
+    load_failed: Optional[set[str]] = None
 
 
 # ModelRunnerOutput is serialized and sent to the scheduler process.
