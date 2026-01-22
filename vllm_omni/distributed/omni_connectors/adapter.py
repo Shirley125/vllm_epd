@@ -200,6 +200,13 @@ class OmniChunkManager:
             for req_id in pending_reqs_ids:
                 logger.info(f"cwj recv loop req = {req_id}")
 
+                if req_id in self.connector.finished_requests:
+                    with self.lock:
+                        self._finished_load_reqs.add(req_id)
+                        if req_id in self._pending_load_reqs:
+                            del self._pending_load_reqs[req_id]
+                    continue
+
                 stage_id = self.connector.stage_id
                 target_stage_id = stage_id - 1
                 chunk_id = self.connector.get_requests[req_id]
@@ -228,14 +235,16 @@ class OmniChunkManager:
                                 self.connector.finished_requests.add(req_id)
                         else:
                             if payload_data.get("finished"):
-                                connector.finished_requests.add(request_id)
-                                request.status = RequestStatus.FINISHED_STOPPED
+                                self.connector.finished_requests.add(req_id)
+                                req = self._pending_load_reqs[req_id]
+                                req.status = RequestStatus.FINISHED_STOPPED
 
                             # TODO: remove special handling for prompt token ids ?
+                            req = self._pending_load_reqs[req_id]
                             if chunk_id == 0:
-                                request.prompt_token_ids = payload_data.get("code_predictor_codes", [])
+                                req.prompt_token_ids = payload_data.get("code_predictor_codes", [])
                             else:
-                                request.prompt_token_ids += payload_data.get("code_predictor_codes", [])
+                                req.prompt_token_ids += payload_data.get("code_predictor_codes", [])
 
                         # Mark as finished for consumption
                         with self.lock:
