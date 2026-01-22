@@ -246,6 +246,18 @@ class OmniChunkManager:
                             else:
                                 req.prompt_token_ids += payload_data.get("code_predictor_codes", [])
 
+                            # Force update num_tokens related attributes if they are not properties
+                            # We assume standard vLLM Request structure where these might be cached or simple attributes
+                            if hasattr(req, "num_tokens"):
+                                # Check if it's a property
+                                if not isinstance(getattr(type(req), "num_tokens", None), property):
+                                     req.num_tokens = len(req.prompt_token_ids) + len(req.output_token_ids)
+                            
+                            if hasattr(req, "num_tokens_with_spec"):
+                                 if not isinstance(getattr(type(req), "num_tokens_with_spec", None), property):
+                                     # Approximation
+                                     req.num_tokens_with_spec = len(req.prompt_token_ids) + len(req.output_token_ids) + len(getattr(req, "spec_token_ids", []))
+
                         # Mark as finished for consumption
                         with self.lock:
                             self._finished_load_reqs.add(req_id)
